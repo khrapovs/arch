@@ -233,8 +233,7 @@ class VolatilityProcess(object):
         the distribution used by the model.
         """
         sigma2 = np.zeros_like(resids)
-        self.compute_variance(parameters, resids, sigma2, backcast, var_bounds,
-                              False)
+        self.compute_variance(parameters, resids, sigma2, backcast, var_bounds)
         return self._normal.loglikelihoood([], resids, sigma2)
 
     def parameter_names(self):
@@ -425,14 +424,20 @@ class GARCH(VolatilityProcess):
 
         return bounds
 
-    def constraints(self):
+    def constraints(self, target=False):
         p, o, q = self.p, self.o, self.q
         k_arch = p + o + q
         # alpha[i] >0
         # alpha[i] + gamma[i] > 0 for i<=p, otherwise gamma[i]>0
         # beta[i] >0
         # sum(alpha) + 0.5 sum(gamma) + sum(beta) < 1
-        a = zeros((k_arch + 2, k_arch + 1))
+        if target:
+            a = zeros((k_arch + 4, k_arch + 1))
+            b = zeros(k_arch + 4)
+        else:
+            a = zeros((k_arch + 2, k_arch + 1))
+            b = zeros(k_arch + 2)
+
         for i in range(k_arch + 1):
             a[i, i] = 1.0
         for i in range(o):
@@ -441,12 +446,22 @@ class GARCH(VolatilityProcess):
 
         a[k_arch + 1, 1:] = -1.0
         a[k_arch + 1, p + 1:p + o + 1] = -0.5
-        b = zeros(k_arch + 2)
         b[k_arch + 1] = -1.0
+
+        if target:
+
+            a[k_arch + 2, 0] = 1
+            a[k_arch + 2, 1:] = self.var_target
+            a[k_arch + 2, p + 1:p + o + 1] = self.var_target/2
+            a[k_arch + 3, :] = -a[k_arch + 2, :]
+            b[k_arch + 1] = -1.0
+            b[k_arch + 2] = self.var_target
+            b[k_arch + 3] = -self.var_target
+
         return a, b
 
     def compute_variance(self, parameters, resids, sigma2, backcast,
-                         var_bounds, target):
+                         var_bounds):
         # fresids is abs(resids) ** power
         # sresids is I(resids<0)
         power = self.power
@@ -454,12 +469,6 @@ class GARCH(VolatilityProcess):
         sresids = sign(resids)
         p, o, q = self.p, self.o, self.q
         nobs = resids.shape[0]
-        if target:
-            scale = ones_like(parameters)
-            scale[p + 1:p + o + 1] = 0.5
-            persistence = np.sum(parameters * scale)
-            omega = (resids**2).mean() * (1.0 - persistence)
-            parameters = np.concatenate(([omega], parameters))
         garch_recursion(parameters, fresids, sresids, sigma2, p, o, q, nobs,
                         backcast, var_bounds)
         inv_power = 2.0 / power
@@ -1096,13 +1105,26 @@ class EGARCH(VolatilityProcess):
 
         return bounds
 
-    def constraints(self):
+    def constraints(self, target=False):
         p, o, q = self.p, self.o, self.q
         k_arch = p + o + q
-        a = zeros((1, k_arch + 1))
+        if target:
+            a = zeros((3, k_arch + 1))
+            b = zeros((3,))
+        else:
+            a = zeros((1, k_arch + 1))
+            b = zeros((1,))
         a[0, p + o + 1:] = -1.0
-        b = zeros((1,))
         b[0] = -1.0
+
+        if target:
+            a[1, 0] = 1
+            a[1, p + o + 1:] = np.log(self.var_target)
+            a[2, 0] = -1
+            a[2, p + o + 1:] = -np.log(self.var_target)
+            b[1] = np.log(self.var_target)
+            b[2] = -np.log(self.var_target)
+
         return a, b
 
     def compute_variance(self, parameters, resids, sigma2, backcast,
