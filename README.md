@@ -5,7 +5,7 @@
 
 # ARCH
 
-This is a work-in-progress for ARCH and other tools for financial econometrics, 
+This is a work-in-progress for ARCH and other tools for financial econometrics,
 written in Python (and Cython)
 
 ## What is in this repository?
@@ -19,12 +19,12 @@ written in Python (and Cython)
 Documentation is hosted on [read the docs](http://arch.readthedocs.org/en/latest/)
 
 ## More about ARCH
-More information about ARCH and related models is available in the notes and 
+More information about ARCH and related models is available in the notes and
 research available at [Kevin Sheppard's site](http://www.kevinsheppard.com).
 
 ## Contributing
 
-Contributions are welcome.  There are opportunities at many levels to 
+Contributions are welcome.  There are opportunities at many levels to
 contribute:
 
 * Implement new volatility process, e.g FIGARCH
@@ -34,7 +34,7 @@ contribute:
 ## Examples
 
 <a name="volatility"/>
-### Volatility Modeling 
+### Volatility Modeling
 
 * Mean models
     * Constant mean
@@ -51,6 +51,7 @@ contribute:
 * Distributions
     * Normal
     * Student's T
+    * Skewed Student
 
 See the [univariate volatility example notebook](http://nbviewer.ipython.org/github/bashtage/arch/blob/master/examples/univariate_volatility_modeling.ipynb) for a more complete overview.
 
@@ -92,8 +93,8 @@ See the [unit root testing example notebook](http://nbviewer.ipython.org/github/
     * Apply method to estimate model across bootstraps
     * Generic Bootstrap iterator
 
-See the [bootstrap example notebook](http://nbviewer.ipython.org/github/bashtage/arch/blob/master/examples/bootstrap_examples.ipynb) 
-for examples of bootstrapping the Sharpe ratio and a Probit model from 
+See the [bootstrap example notebook](http://nbviewer.ipython.org/github/bashtage/arch/blob/master/examples/bootstrap_examples.ipynb)
+for examples of bootstrapping the Sharpe ratio and a Probit model from
 Statsmodels.
 
 
@@ -119,7 +120,7 @@ def sharpe_ratio(x):
 # Bootstrap confidence intervals
 from arch.bootstrap import IIDBootstrap
 bs = IIDBootstrap(returns)
-ci = bs.conf_int(sharpe_ratio, 1000, method='percentile')    
+ci = bs.conf_int(sharpe_ratio, 1000, method='percentile')
 ```
 
 <a name="multiple-comparison"/>
@@ -129,7 +130,7 @@ ci = bs.conf_int(sharpe_ratio, 1000, method='percentile')
 * Stepwise (StepM)
 * Model Confidence Set (MCS)
 
-See the [multiple comparison example notebook](http://nbviewer.ipython.org/github/bashtage/arch/blob/master/examples/multiple-comparison_examples.ipynb) 
+See the [multiple comparison example notebook](http://nbviewer.ipython.org/github/bashtage/arch/blob/master/examples/multiple-comparison_examples.ipynb)
 for examples of the multiple comparison procedures.
 
 ## Requirements
@@ -142,7 +143,7 @@ for examples of the multiple comparison procedures.
 
 ### Optional Requirements
 
-* Numba (0.15+) will be used if available **and** when installed using the 
+* Numba (0.15+) will be used if available **and** when installed using the
 --no-binary option
 * IPython (3.0+) is required to run the notebooks
 
@@ -181,15 +182,15 @@ pip install git+git://github.com/bashtage/arch.git
 
 **No Compiler**
 
-All binary code is backed by a pure Python implementation.  Compiling can be 
+All binary code is backed by a pure Python implementation.  Compiling can be
 skipped using the flag `--no-binary`
- 
+
 ```
 pip install git+git://github.com/bashtage/arch.git --install-option "--no-binary"
 ```
 
-_Note: the test suite compares the Numba implementations against Cython 
-implementations of some recursions, and so it is not possible to run the 
+_Note: the test suite compares the Numba implementations against Cython
+implementations of some recursions, and so it is not possible to run the
 test suite when installing with_ `--no-binary` .
 
 **Anaconda**
@@ -197,4 +198,3 @@ test suite when installing with_ `--no-binary` .
 ```
 conda install -c https://conda.binstar.org/bashtage arch
 ```
-

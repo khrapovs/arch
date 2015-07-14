@@ -11,7 +11,7 @@ import numpy as np
 from numpy.linalg import matrix_rank
 from numpy import ones, zeros, sqrt, diag, empty, ceil
 import scipy
-from scipy.optimize import fmin_slsqp
+from scipy.optimize import fmin_slsqp, minimize
 import scipy.stats as stats
 import pandas as pd
 
@@ -295,7 +295,7 @@ class ARCHModel(object):
 
         # 2. Compute sigma2 using VolatilityModel
         sigma2 = self.volatility.compute_variance(vp, resids, sigma2, backcast,
-                                                  var_bounds)
+                                                  var_bounds, self.target)
         # 3. Compute log likelihood using Distribution
         llf = self.distribution.loglikelihoood(dp, resids, sigma2, individual)
 
@@ -319,7 +319,7 @@ class ARCHModel(object):
         return x[:km], x[km:km + kv], x[km + kv:]
 
     def fit(self, update_freq=1, disp='final', starting_values=None,
-            cov_type='robust'):
+            cov_type='robust', target=False):
         """
         Fits the model given a nobs by 1 vector of sigma2 values
 
@@ -348,6 +348,9 @@ class ARCHModel(object):
         # 1. Check in ARCH or Non-normal dist.  If no ARCH and normal,
         # use closed form
         v, d = self.volatility, self.distribution
+        self.target = target
+        if self.target:
+            v.num_params -= 1
         offsets = np.array((self.num_params, v.num_params, d.num_params))
         total_params = sum(offsets)
         has_closed_form = (v.num_params == 1 and d.num_params == 0) or \
@@ -363,12 +366,17 @@ class ARCHModel(object):
         backcast = v.backcast(resids)
         self._backcast = backcast
         sv_volatility = v.starting_values(resids)
+        v_constraints = self.volatility.constraints()
+        if self.target:
+            sv_volatility = sv_volatility[1:]
+            v_constraints = v_constraints[0][1:, 1:], v_constraints[1][1:]
         var_bounds = v.variance_bounds(resids)
-        v.compute_variance(sv_volatility, resids, sigma2, backcast, var_bounds)
+        v.compute_variance(sv_volatility, resids, sigma2, backcast, var_bounds,
+                           self.target)
         std_resids = resids / sqrt(sigma2)
         # 2. Construct constraint matrices from all models and distribution
         constraints = (self.constraints(),
-                       self.volatility.constraints(),
+                       v_constraints,
                        self.distribution.constraints())
 
         num_constraints = [c[0].shape[0] for c in constraints]
@@ -388,7 +396,10 @@ class ARCHModel(object):
                 b[r_st:r_en] = c[1]
 
         bounds = self.bounds()
-        bounds.extend(v.bounds(resids))
+        v_bounds = v.bounds(resids)
+        if self.target:
+            v_bounds = v.bounds(resids)[1:]
+        bounds.extend(v_bounds)
         bounds.extend(d.bounds(std_resids))
 
         var_bounds = v.variance_bounds(resids)
@@ -437,8 +448,8 @@ class ARCHModel(object):
 
         if SP14:
             xopt = fmin_slsqp(func, sv, f_ieqcons=f_ieqcons, bounds=bounds,
-                              args=args, iter=100, acc=1e-06, iprint=1,
-                              full_output=1, epsilon=1.4901161193847656e-08,
+                              args=args, iprint=1,
+                              full_output=1,
                               callback=callback, disp=disp)
         else:
             if update_freq > 0:  # Fix limit in SciPy < 0.14
@@ -448,15 +459,28 @@ class ARCHModel(object):
                               full_output=1, epsilon=1.4901161193847656e-08,
                               disp=disp)
 
+        # xopt = minimize(func, xopt[0], args=args, method='Nelder-Mead')
+
         # 5. Return results
         params = xopt[0]
+
         loglikelihood = -1.0 * xopt[1]
 
         mp, vp, dp = self._parse_parameters(params)
 
+        if self.target:
+            scale = np.ones_like(vp)
+            scale[v.p:v.p + v.o] = 0.5
+            persistence = np.sum(vp * scale)
+            omega = (resids**2).mean() * (1.0 - persistence)
+            vp = np.concatenate(([omega], vp))
+            v.num_params += 1
+            params = np.hstack((mp, vp, dp))
+
         resids = self.resids(mp)
         vol = np.zeros_like(resids)
-        self.volatility.compute_variance(vp, resids, vol, backcast, var_bounds)
+        self.volatility.compute_variance(vp, resids, vol, backcast, var_bounds,
+                                         False)
         vol = np.sqrt(vol)
 
         try:

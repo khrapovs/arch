@@ -233,7 +233,8 @@ class VolatilityProcess(object):
         the distribution used by the model.
         """
         sigma2 = np.zeros_like(resids)
-        self.compute_variance(parameters, resids, sigma2, backcast, var_bounds)
+        self.compute_variance(parameters, resids, sigma2, backcast, var_bounds,
+                              False)
         return self._normal.loglikelihoood([], resids, sigma2)
 
     def parameter_names(self):
@@ -445,16 +446,20 @@ class GARCH(VolatilityProcess):
         return a, b
 
     def compute_variance(self, parameters, resids, sigma2, backcast,
-                         var_bounds):
+                         var_bounds, target):
         # fresids is abs(resids) ** power
         # sresids is I(resids<0)
         power = self.power
         fresids = abs(resids) ** power
         sresids = sign(resids)
-
         p, o, q = self.p, self.o, self.q
         nobs = resids.shape[0]
-
+        if target:
+            scale = ones_like(parameters)
+            scale[p + 1:p + o + 1] = 0.5
+            persistence = np.sum(parameters * scale)
+            omega = (resids**2).mean() * (1.0 - persistence)
+            parameters = np.concatenate(([omega], parameters))
         garch_recursion(parameters, fresids, sresids, sigma2, p, o, q, nobs,
                         backcast, var_bounds)
         inv_power = 2.0 / power
